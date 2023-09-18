@@ -1,10 +1,33 @@
+---
+title: "Lab2-Personal report"
+author: "Arash"
+date: "2023-09-16"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.show="hold")
+```
+
+## Attaching The Packages and Loading the Data
+
+First, the required packages are attached.
+
+```{r}
 library(HMM)
 library(entropy)
+```
 
 
-# 1 -----------------------------------------------------------------------
+
+## Question 1
+
+First, I created the transition and emission probability of Hidden Markov Model and at the end we create HMM model:
 
 
+```{r}
 n_states <- 10
 states <- 1:n_states
 symbols <- letters[states]
@@ -29,28 +52,78 @@ for(i in seq_len(n_states)){
 
 
 robot_HMM <- initHMM(states, symbols, start_probs, transition_probs, emission_probs)
+```
 
+## Question 2
 
-# 2 -----------------------------------------------------------------------
-set.seed(1378)
+Now, we sample 100 observations from the HMM.
+
+```{r}
+set.seed(1234)
 robot_sim <- simHMM(robot_HMM, 100)
+```
 
 
-# 3 -----------------------------------------------------------------------
+## Question 3
+
+To calculate filtering and smoothing probability distributions, we need alpha and beta tables where we can get them with `forward()` and `backward()`.
+
+$$
+Filtering = \ p(z_t|x_{0:t}) = \frac{\alpha(z_t)}{\sum_{z_t}\alpha(z_t)}
+\\
+Smoothing = \ p(z_t|x_{0:T}) = \frac{\alpha(z_t)\beta(z_t)}{\sum_{z_t}\alpha(z_t)\beta(z_t)}
+$$
+
+For getting the most probable path, we can use `viterbi()` algorithm.
+
+```{r}
 robot_observations <- robot_sim$observation
 
 alpha <- exp(forward(robot_HMM, robot_observations))
 beta <- exp(backward(robot_HMM, robot_observations))
 
-# smoothing_dist <- (alpha * beta) / colSums(alpha * beta)
 smoothing_dist <- prop.table(alpha * beta, 2)
-# filtering_dist <- alpha / colSums(alpha)
 filtering_dist <- prop.table(alpha, 2)
 
 likely_path <- viterbi(robot_HMM, robot_observations)
+```
 
-# 4 -----------------------------------------------------------------------
 
+## Question 4
+
+To get the most likely path using filtering and smoothing distributions, we can get the index of the variable that has the highest probability at each time step.
+
+```{r}
+smoothing_path <- apply(smoothing_dist, 2, which.max)
+filtering_path <- apply(filtering_dist, 2, which.max)
+
+table(smoothing_path, robot_sim$states)
+mean(smoothing_path == robot_sim$states)
+
+table(filtering_path, robot_sim$states)
+mean(filtering_path == robot_sim$states)
+
+table(likely_path, robot_sim$states)
+mean(likely_path == robot_sim$states)
+```
+
+
+The accuracy of the smoothing is `r mean(smoothing_path == robot_sim$states)`, The accuracy of the filtering is `r mean(filtering_path == robot_sim$states)` and the The accuracy of the viterbi is `r mean(likely_path == robot_sim$states)`.
+
+Depending on the runs, the accuracy of the smoothing is higher than filtering and viterbi.
+
+
+```{r}
+set.seed(12345)
+robot_sim <- simHMM(robot_HMM, 100)
+robot_observations <- robot_sim$observation
+
+alpha <- exp(forward(robot_HMM, robot_observations))
+beta <- exp(backward(robot_HMM, robot_observations))
+
+smoothing_dist <- prop.table(alpha * beta, 2)
+filtering_dist <- prop.table(alpha, 2)
+likely_path <- viterbi(robot_HMM, robot_observations)
 
 smoothing_path <- apply(smoothing_dist, 2, which.max)
 filtering_path <- apply(filtering_dist, 2, which.max)
@@ -63,40 +136,26 @@ mean(filtering_path == robot_sim$states)
 
 table(likely_path, robot_sim$states)
 mean(likely_path == robot_sim$states)
-
-# 5 -----------------------------------------------------------------------
-set.seed(1343)
-robot_sim <- simHMM(robot_HMM, 100)
-robot_observations <- robot_sim$observation
-
-alpha <- exp(forward(robot_HMM, robot_observations))
-beta <- exp(backward(robot_HMM, robot_observations))
-
-# smoothing_dist <- (alpha * beta) / colSums(alpha * beta)
-smoothing_dist <- prop.table(alpha * beta, 2)
-# filtering_dist <- alpha / colSums(alpha)
-filtering_dist <- prop.table(alpha, 2)
-likely_path <- viterbi(robot_HMM, robot_observations)
-
-smoothing_path <- apply(smoothing_dist, 2, which.max)
-filtering_path <- apply(filtering_dist, 2, which.max)
-
-table(smoothing_path, robot_sim$states)
-mean(smoothing_path == robot_sim$states)
-
-table(filtering_path, robot_sim$states)
-mean(filtering_path == robot_sim$states)
-
-table(likely_path, robot_sim$states)
-mean(likely_path == robot_sim$states)
-
-# More accurate than filtering as we have the whole data points and we can use both the past and the future to do inference on value of zt
-# The case is also is true for Viterbi result. The algorithm maximizes the value of zt given all the past values of z and x.
+```
 
 
-# 6 -----------------------------------------------------------------------
+Smoothing has the highest accuracy since it has the information both from the past and the future of $z_t$ to do inference on value of $z_t$. The case is also is true for Viterbi result. The algorithm maximizes the value of $z_t$ given all the past values of $z_{1:t-1}$ and $z_{1:t-1}$.
 
 
+## Question 6
+
+```{r}
+filter_entropy <- apply(filtering_dist, 2, entropy.empirical)
+plot(filter_entropy, type = "l", main = "filtering entropy")
+
+smoothing_entropy <- apply(smoothing_dist, 2, entropy.empirical)
+plot(smoothing_entropy, type = "l", main = "smoothing entropy")
+```
+
+
+Based on the plot, the entropy of the filtering shows that we are more uncertain about the location of the robot while the smoothing have lower entropy on average. Therefore, by time we do not get more information.
+
+```{r}
 filter_path <- matrix(nrow = 200, ncol =100)
 smooth_path <- matrix(nrow = 200, ncol =100)
 for (i in seq_len(200)){
@@ -121,11 +180,25 @@ plot(x, type ="l")
 x <- apply(smooth_count, 2, entropy.empirical)
 plot(x, type ="l")
 
+```
 
-# 7 -----------------------------------------------------------------------
 
-# p(zt+1 | z0:T, x0:T) = p(zt+1|zT)p(zT|x0:T)
-# p(zt+1|zt)  is transition_probs
-# p(zt+1|zt)  last filter 
 
+## Question 7
+
+
+
+$$
+p(z_{t+1} | z_{0:T}, x_{0:T}) = p(z_{t+1}|z_T).p(z_T|x_{0:T}) \ where\ z_{t+1}\ is\ independent\ of\ z_{0:t-1} \ given\ z_t
+\\
+p(z_{t+1}|z_T)\ is\  transition\ probability
+\\
+p(z_{t+1}|z_t)\ last\ filter 
+$$
+
+Based on the formula, we can get the prediction:
+
+```{r}
 filtering_dist[, 100] %*% transition_probs
+```
+

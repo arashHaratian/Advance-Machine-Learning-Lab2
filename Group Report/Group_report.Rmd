@@ -1,0 +1,194 @@
+---
+title: "LAB 2: HIDDEN MARKOV MODELS"
+author: "Arash Haratian, Daniel Díaz-Roncero González, Elena Dalla Torre & Juan Manuel Pardo Ladino"
+date: "2023-09-16"
+output: pdf_document
+---
+
+## Question 1  
+  
+   
+  
+```{r,warning=FALSE,message=FALSE}
+library(HMM)
+States <- c("1","2","3","4","5","6","7","8","9","10")
+Symbols <- c("1","2","3","4","5","6","7","8","9","10")
+startProbs <- c(.1,.1,.1,.1,.1,.1,.1,.1,.1,.1)
+
+transProbs <- matrix(c(.5,.5,0,0,0,0,0,0,0,0,
+                        0,.5,.5,0,0,0,0,0,0,0,
+                        0,0,.5,.5,0,0,0,0,0,0,
+                        0,0,0,.5,.5,0,0,0,0,0,
+                        0,0,0,0,.5,.5,0,0,0,0,
+                        0,0,0,0,0,.5,.5,0,0,0,
+                        0,0,0,0,0,0,.5,.5,0,0,
+                        0,0,0,0,0,0,0,.5,.5,0,
+                        0,0,0,0,0,0,0,0,.5,.5,
+                        .5,0,0,0,0,0,0,0,0,.5), 
+                     nrow=length(States), ncol=length(States), byrow = TRUE)
+emissionProbs <- matrix(c(.2,.2,.2,0,0,0,0,0,.2,.2,
+                          .2,.2,.2,.2,0,0,0,0,0,.2,
+                          .2,.2,.2,.2,.2,0,0,0,0,0,
+                          0,.2,.2,.2,.2,.2,0,0,0,0,
+                          0,0,.2,.2,.2,.2,.2,0,0,0,
+                          0,0,0,.2,.2,.2,.2,.2,0,0,
+                          0,0,0,0,.2,.2,.2,.2,.2,0,
+                          0,0,0,0,0,.2,.2,.2,.2,.2,
+                          .2,0,0,0,0,0,.2,.2,.2,.2,
+                          .2,.2,0,0,0,0,0,.2,.2,.2), 
+                        nrow=length(States), ncol=length(States), byrow = TRUE)
+
+hmm <- initHMM(States,Symbols,startProbs,transProbs,emissionProbs)
+```
+  
+
+## Question 2  
+  
+  
+```{r,warning=FALSE,message=FALSE}
+set.seed(1234)
+sim <- simHMM(hmm,100)
+sim
+
+```
+  
+
+
+  
+## Question 3  
+  
+  
+```{r,warning=FALSE,message=FALSE}
+observations <- sim$observation
+filteredprobs <- forward(hmm,observations)
+expfiltered <- exp(filteredprobs)
+ptfiltered <- prop.table(expfiltered,2)
+smoothedprobs <- posterior(hmm,observations)
+mostprobpath <- viterbi(hmm,observations)
+```
+   
+  
+## Question 4  
+  
+  
+```{r,warning=FALSE,message=FALSE,results='hold'}
+accuracies <- function(fp,sp,mp,simstates){
+  maxptfiltered <- apply(ptfiltered,2,which.max)
+  maxpost <- apply(sp,2,which.max)
+  tfilt <- table(maxptfiltered==simstates)[["TRUE"]]/100
+  tsmooth <- table(maxpost==simstates)[["TRUE"]]/100
+  tmostprob <- table(mp==simstates)[["TRUE"]]/100
+  return(c(tfilt,tsmooth,tmostprob))
+}
+accuracy_values <- accuracies(ptfiltered,smoothedprobs,mostprobpath,sim$states)
+tfilt <- accuracy_values[1]
+tsmooth <- accuracy_values[2]
+tmostprob <- accuracy_values[3]
+
+
+paste("The accuracy of the filtered probability distribution is:",tfilt)
+paste("The accuracy of the smoothed probability distribution is:",tsmooth)
+paste("The accuracy of the most probable path is:",tmostprob)
+
+```
+  
+
+## Question 5  
+  
+```{r,warning=FALSE,message=FALSE}
+
+accuracy <- function(HMM, observations, hiddenStates) {
+  "Given a HMM and its simulated observations and hidden states
+  returns a list of the filtering, smoothing and viterbi accuracy
+  respectively."
+ 
+  N <- length(observations)
+ 
+  # filtering probabilities
+  logForwardProbs <- forward(HMM, observations)
+  forwardProbs <- exp(logForwardProbs)
+  filterProbs <- prop.table(forwardProbs, 2)
+ 
+  filterPred <- apply(filterProbs, 2, which.max)
+  filterAcc <- sum(filterPred == hiddenStates) / N
+ 
+  # smoothing probabilities
+  logBackwardProbs <- backward(HMM, observations)
+  backwardProbs <- exp(logBackwardProbs)
+  smoothProbs <- prop.table(forwardProbs * backwardProbs, 2)
+ 
+  smoothPred <- apply(smoothProbs, 2, which.max)
+  smoothAcc <- sum(smoothPred == hiddenStates) / N
+ 
+  # most probable path
+  viterbiPath <- viterbi(HMM, observations)
+ 
+  viterbiPred <- viterbiPath
+  viterbiAcc <- sum(viterbiPred == hiddenStates) / N
+ 
+  return(c(filterAcc, smoothAcc, viterbiAcc))
+}
+
+# number of simulations
+n <- 10
+accuracies <- matrix(0, nrow = n, ncol = 3)
+colnames(accuracies) <- c("Filter", "Smooth", "Viterbi")
+for (i in 1:n) {
+  # simulate HMM
+  simulatedHMM <- simHMM(hmm, 100)
+  observations <- simulatedHMM$observation
+  hiddenStates <- simulatedHMM$states
+ 
+  # compute accuracies
+  acc <- accuracy(hmm, observations, hiddenStates)
+  # fill in the matrix
+  accuracies[i, ] <- acc
+}
+accuracies
+```
+
+The smoothed probability distribution uses all the observations to calculate the probability of been in one state at a specific time, hence it also uses the information at time t+1,t+2,etc which gives information about the state at time t, as it might discard some states and make more probable other states. That's why the smoothed probability distribution performs better than the filtered probability distribution, which only has into account the observations up to time t.  
+  
+The smoothed distributions are also more accurate than the most probable paths, because for a specific time t we might have a higher probability of being at an specific state s1, but that the most probable path doesn't go through s1 (it goes through s2), instead many more less likely paths go through s1. In this case the most probable path won't choose s1, while it is more likely than s2, hence generally ending in lower accuracy.   
+  
+
+## Question 6  
+  
+```{r,warning=FALSE,message=FALSE}
+library(entropy)
+
+entropies <- apply(ptfiltered,2,entropy.empirical)
+plot(entropies) 
+```
+  
+No, it is not true, as we can see the entropy values don't tend to decrease, instead they fluctuate around 1. This means that the uncertainty of the robot's position doesn't improve with more  observations (unless the number of observations is very low, because at time t=1 we have always the highest uncertainty).  
+We can also observe that at some points, the entropy is 0, which means that for those points we know exactly where the robot is, but then at some point after that the entropy increases again and we loose track of the robot.  
+  
+## Question 7  
+  
+$$  
+p(z_{t+1} | z_{0:T}, x_{0:T}) = p(z_{t+1}|z_T).p(z_T|x_{0:T}) \ where\ z_{t+1}\ is\ independent\ of\ z_{0:t-1} \ given\ z_t
+\\
+p(z_{t+1}|z_T)\ is\  transition\ probability
+\\
+p(z_{t+1}|z_t)\ last\ filter
+$$
+
+
+```{r,warning=FALSE,message=FALSE}
+
+probs100 <- matrix(smoothedprobs[,"100"],nrow=1)
+probs100%*%transProbs
+```
+
+## Statement of Contribution
+
+All the members of the group contributed with code, text and discussions in every question. The individuals solutions of all members were compared in order to decide the best approach. Although the four students contributed to every question a more detailed list of who contributed more to each question would be the following:  
+
+  - Question 1: Daniel Díaz-Roncero González and Juan Manuel Pardo Ladino 
+  - Question 2: Arash Haratian and Juan Manuel Pardo Ladino      
+  - Question 3: Elena Dalla Torre  and Arash Haratian       
+  - Question 4: Arash Haratian and Daniel Díaz-Roncero González   
+  - Question 5: All contributed equally     
+  - Question 6: Daniel Díaz-Roncero González and Elena Dalla Torre   
+  - Question 7: Juan Manuel Pardo Ladino and Elena Dalla Torre   
