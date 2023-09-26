@@ -188,13 +188,22 @@ plot(x, type ="l")
 
 
 
+$$  
+p(z_{t+1} | z_{0:T}, x_{0:T}) = \sum_{z_T} p(z_{t+1}|z_T).p(z_T|x_{0:T}) \ where\ z_{t+1} \perp  z_{0:t-1} | z_t
 $$
-p(z_{t+1} | z_{0:T}, x_{0:T}) = p(z_{t+1}|z_T).p(z_T|x_{0:T}) \ where\ z_{t+1}\ is\ independent\ of\ z_{0:t-1} \ given\ z_t
-\\
+
+
+$$
 p(z_{t+1}|z_T)\ is\  transition\ probability
-\\
-p(z_{t+1}|z_t)\ last\ filter 
 $$
+
+
+$$
+p(z_{t+1}|z_t)\ last\ filter
+$$
+
+This summation and multiplication can be done with a matrix multiplication, as follow: 
+
 
 Based on the formula, we can get the prediction:
 
